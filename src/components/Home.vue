@@ -462,6 +462,9 @@ const likeImage = async (image) => {
     // Toggle like status optimistically
     const wasLiked = image.is_liked;
     image.is_liked = !wasLiked;
+
+    console.log(image.is_liked, "like");
+
     image.likes = wasLiked ? image.likes - 1 : image.likes + 1;
 
     // Hide animation after 1 second
@@ -472,7 +475,7 @@ const likeImage = async (image) => {
     // API call to like/unlike using single endpoint
     const token = localStorage.getItem("authToken");
 
-    await axios.post(
+    const response = await axios.post(
       API_ENDPOINTS.IMAGE.LIKE_UNLIKE(image._id),
       {
         is_liked: !wasLiked, // Send true to like, false to unlike
@@ -483,6 +486,8 @@ const likeImage = async (image) => {
         },
       }
     );
+    if (response.status)
+      syncLikeToImagesArray(image._id, image.is_liked, image.likes);
   } catch (error) {
     console.error("Like error:", error);
 
@@ -492,6 +497,15 @@ const likeImage = async (image) => {
 
     // Show error message
     alert("Failed to like image. Please try again.");
+  }
+};
+
+const syncLikeToImagesArray = (imageId, isLiked, likesCount) => {
+  const imageIndex = images.value.findIndex((img) => img._id === imageId);
+  if (imageIndex !== -1) {
+    // Update the image in the array
+    images.value[imageIndex].is_liked = isLiked;
+    images.value[imageIndex].likes = likesCount;
   }
 };
 
