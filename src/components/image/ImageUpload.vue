@@ -252,6 +252,8 @@ import { useToast } from "vue-toastification";
 
 const toast = useToast();
 
+const emit = defineEmits(["images-uploaded"]);
+
 // Modal state
 const showModal = ref(false);
 
@@ -436,6 +438,8 @@ const uploadImages = async () => {
 
     // Show success toast
     toast.success(`${previews.value.length} files uploaded successfully.`);
+
+    emit("images-uploaded");
 
     // Close modal after a short delay
     setTimeout(() => {

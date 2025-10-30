@@ -17,19 +17,19 @@
             <button
               v-if="!authStore.isAuthenticated"
               class="btn btn-outline-primary btn-sm me-2"
-              @click="login"
+              @click="$router.push('/login')"
             >
               Log in
             </button>
             <button
               v-if="!authStore.isAuthenticated"
               class="btn btn-primary btn-sm"
-              @click="signup"
+              @click="$router.push('/signup')"
             >
               Sign up
             </button>
             <div class="d-flex" v-else>
-              <ImageUploadModal />
+              <ImageUploadModal @images-uploaded="fetchImages" />
               <div class="dropdown" ref="dropdownElement">
                 <button
                   class="btn user-avatar-dropdown dropdown-toggle"
@@ -97,11 +97,11 @@
       </ul>
     </div>
 
-    <div class="text-center" v-if="!loading && !images.length">
+    <div class="text-center p-3" v-if="!loading && !images.length">
       <strong>No Images</strong>
     </div>
 
-    <div class="text-center" v-if="loading">
+    <div class="text-center p-3" v-if="loading">
       <strong>Loading Images..</strong>
     </div>
 
@@ -154,48 +154,13 @@
           </div>
         </div>
       </div>
-      <!-- <div
-        class="image-card"
-        v-for="image in images"
-        :key="image.id"
-        :style="{ gridRowEnd: `span ${image.span}` }"
-      >
-        <div class="image-wrapper">
-          <img
-            :src="getImageUrl(image.file_url)"
-            :alt="image.description || 'Image'"
-            class="img-fluid"
-            @load="onImageLoad(image)"
-          />
-          <div class="image-overlay">
-            <div class="overlay-content">
-              <div class="user-info">
-                <img
-                  :src="image.user.avatar"
-                  :alt="image.user.name"
-                  class="user-avatar"
-                />
-                <span class="user-name">{{ image.user.name }}</span>
-              </div>
-              <div class="likes-info">
-                <button class="btn btn-light btn-sm like-btn">❤️</button>
-                <span class="likes-count">{{ image.likes }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div> -->
     </div>
 
-    <!-- Load More Button -->
-    <div class="text-center mt-5">
-      <button
-        v-if="hasMore"
-        class="btn btn-outline-primary px-4 py-2"
-        @click="loadMore"
-      >
-        {{ loadingMore ? "Loading.." : "Load More" }}
-      </button>
+    <!-- Loading indicator for infinite scroll -->
+    <div class="text-center mt-4 mb-4" v-if="loadingMore">
+      <div class="loading-spinner">
+        <strong>Loading more images...</strong>
+      </div>
     </div>
   </main>
 
@@ -212,7 +177,7 @@
   <footer class="footer bg-light mt-5">
     <div class="container text-center py-4">
       <p class="text-muted mb-0">
-        © 2023 PhotoShare. Free high-resolution photos.
+        © {{ new Date().getFullYear() }} SelfLens. Free quality photos.
       </p>
     </div>
   </footer>
@@ -225,9 +190,9 @@ import { CATEGORIES } from "@/config/image";
 import { userStore } from "@/stores/userStore";
 import axios from "axios";
 import ImageModal from "@/components/image/show.vue";
-import { Dropdown } from "bootstrap";
+import api from "@/services/api";
 
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 
 const isToggleDropdown = ref(false);
 
@@ -253,62 +218,33 @@ const isTabLoaded = ref({});
 const selectedImage = ref(null);
 const showImageModal = ref(false);
 
-// Fetch images from API
-// const fetchImages = async (page = 1, search = "") => {
-//   try {
-//     if (page === 1) {
-//       loading.value = true;
-//       images.value = [];
-//     } else {
-//       loadingMore.value = true;
-//     }
+// Scroll handler
+const handleScroll = () => {
+  // Don't load more if already loading or no more content
+  if (loadingMore.value || !hasMore.value) return;
 
-//     error.value = null;
+  // Calculate scroll position
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+  const windowHeight = window.innerHeight;
+  const documentHeight = document.documentElement.scrollHeight;
 
-//     const params = new URLSearchParams({
-//       page: page.toString(),
-//       limit: "1",
-//     });
+  // Load more when user is 200px from the bottom
+  const threshold = 200;
 
-//     if (search) {
-//       params.append("search", search);
-//     }
+  if (scrollTop + windowHeight >= documentHeight - threshold) {
+    loadMore();
+  }
+};
 
-//     if (activeTab.value) {
-//       params.append("category", activeTab.value);
-//     }
+// Add scroll event listener
+const setupScrollListener = () => {
+  window.addEventListener("scroll", handleScroll);
+};
 
-//     const response = await axios.get(API_ENDPOINTS.IMAGE.LIST, {
-//       params,
-//     });
-
-//     if (response.status !== 200) {
-//       throw new Error(`Failed to fetch images: ${response.statusText}`);
-//     }
-
-//     const data = response.data.data;
-
-//     console.log(data);
-
-//     if (page === 1) {
-//       images.value = data.images;
-//     } else {
-//       images.value = [...images.value, ...data.images];
-//     }
-
-//     console.log(images.value, "image ref");
-
-//     // Update pagination info
-//     hasMore.value = data.hasMore || images.value.length === 12;
-//     currentPage.value = page;
-//   } catch (err) {
-//     error.value = err.message;
-//     console.error("Error fetching images:", err);
-//   } finally {
-//     loading.value = false;
-//     loadingMore.value = false;
-//   }
-// };
+// Remove scroll event listener
+const removeScrollListener = () => {
+  window.removeEventListener("scroll", handleScroll);
+};
 
 const fetchImages = async (page = 1, search = "") => {
   try {
@@ -323,7 +259,7 @@ const fetchImages = async (page = 1, search = "") => {
 
     const params = new URLSearchParams({
       page: page.toString(),
-      limit: "1",
+      limit: "3",
     });
 
     if (search) {
@@ -339,7 +275,7 @@ const fetchImages = async (page = 1, search = "") => {
 
     console.log(headers, "hh");
 
-    const response = await axios.get(API_ENDPOINTS.IMAGE.LIST, {
+    const response = await api.get(API_ENDPOINTS.IMAGE.LIST, {
       params,
       headers,
     });
@@ -349,8 +285,6 @@ const fetchImages = async (page = 1, search = "") => {
     }
 
     const data = response.data.data;
-
-    console.log(data);
 
     const formatedImages = data.images.map((img) => ({
       ...img,
@@ -420,12 +354,6 @@ const loadMore = () => {
   }
 };
 
-// Set active tab and refetch
-// const setActiveTab = (tabId) => {
-//   activeTab.value = tabId;
-//   currentPage.value = 1;
-//   fetchImages(1, searchQuery.value);
-// };
 const setActiveTab = (tabId) => {
   // Don't do anything if clicking the same tab
   if (activeTab.value === tabId) return;
@@ -475,7 +403,7 @@ const likeImage = async (image) => {
     // API call to like/unlike using single endpoint
     const token = localStorage.getItem("authToken");
 
-    const response = await axios.post(
+    const response = await api.post(
       API_ENDPOINTS.IMAGE.LIKE_UNLIKE(image._id),
       {
         is_liked: !wasLiked, // Send true to like, false to unlike
@@ -526,9 +454,11 @@ const toggleDropdown = () => {
 
 onMounted(() => {
   fetchImages();
-  // if (dropdownElement.value) {
-  //   dropdownInstance = new Dropdown(dropdownElement.value);
-  // }
+  setupScrollListener();
+});
+
+onUnmounted(() => {
+  removeScrollListener();
 });
 </script>
 
@@ -853,6 +783,16 @@ onMounted(() => {
 .likes-count {
   font-weight: 500;
   font-size: 0.9rem;
+}
+
+/* Loading spinner styles */
+.loading-spinner {
+  padding: 2rem;
+  color: #666;
+}
+
+.loading-spinner strong {
+  font-weight: 500;
 }
 
 /* Responsive adjustments */
